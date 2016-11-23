@@ -15,10 +15,9 @@ import copy
 
 class MiningSolution:
 	def __init__(self,filename):
-		self.transactions = list()
 		self.split_type = 'INFOGAIN'      #   INFOGAIN:1 , GINI:2   ,  ERRORRATE:3
 		self.prun_type = 'NOPRUN'       #   NOPRUN:1  ,  PREPRUN:2 , POSTPRUN:3
-		self.ReadFromFile(filename)
+		self.transactions = self.ReadFromFile(filename)
 
 # 初始化决策树和可选属性集
 	def InitTree(self):
@@ -51,13 +50,15 @@ class MiningSolution:
 
 	# read data from file
 	def ReadFromFile(self,filename):
+		transactions = []
 		in_file = open(filename)
 		try:		
 			for line in in_file:
-				self.transactions.append(line.strip().split(','))
+				transactions.append(line.strip().split(','))
 		except:
 			print("error when read file ",filename)
 			in_file.close()
+		return transactions
 
 # 计算数据集的每个label的概率
 	def CalcProbs(self,dataSet):
@@ -115,7 +116,7 @@ class MiningSolution:
 		sub_dataSet_1 = list()
 		sub_dataSet_2 = list()
 		for i in self.attr_indexs:#遍历数据集的每个可用属性
-			attr_list = [example[i] for example in self.transactions]
+			attr_list = [example[i] for example in dataSet]
 			uniq_values = set(attr_list)
 			for thld in uniq_values:
 				sub_dataSet_1_1,sub_dataSet_2_2 = self.SplitDataSet(dataSet,i,thld)  #得到小于阈值的子集和大于阈值的子集
@@ -253,14 +254,36 @@ class MiningSolution:
 		return float(pos_count)/len(validSet)
 
 
+	# 将数据集划分为part_num份
+	def DivideDataSet(self,part_num):
+		devide_trans = []                          #随机分成part_num份后的数据集
+		trans_total = len(self.transactions) 	   #原始数据集的大小
+		part_size = int(trans_total/10)            #数据子集的大小
+		orig_trans = copy.copy(self.transactions)  #原始数据集的拷贝
+
+		# 将原始数据集随机分成10份
+		for i in range(part_num-1):
+			part_trans = []
+			for l in range(part_size):
+				r = random.randint(0,trans_total-1)
+				part_trans.append(orig_trans[r])
+				orig_trans.remove(orig_trans[r])
+				trans_total -= 1
+			devide_trans.append(part_trans)
+		devide_trans.append(orig_trans)
+		return devide_trans
+
+
 	def HoldOutMethod(self):
 		train_trans = []
 		valid_trans = []
+		# 将数据集随机分为训练集和测试集
 		for item in self.transactions:
 			if random.randint(0,1):
 				train_trans.append(item)
 			else:
 				valid_trans.append(item)
+		# 采用3种划分方法，和3种剪枝策略，验证数据集
 		for split_type in range(1,4):
 			self.ChangeSplitMod(split_type)
 			for prun_type in range(1,4):
@@ -274,42 +297,35 @@ class MiningSolution:
 		
 
 	def CrossValidation(self):
-		trans_total = len(self.transactions)  #原始数据集的大小
-		part_size = int(trans_total/10)            #数据子集的大小
 		total_percent = 0.0
-		orig_trans = copy.copy(self.transactions)      #原始数据集的拷贝
-		devide_trans = []                    #随机分成10份后的数据集
-
-		# 将原始数据集随机分成10份
-		for i in range(9):
-			part_trans = []
-			for l in range(part_size):
-				r = random.randint(0,trans_total-1)
-				part_trans.append(orig_trans[r])
-				orig_trans.remove(orig_trans[r])
-				trans_total -= 1
-			devide_trans.append(part_trans)
-		devide_trans.append(orig_trans)
+		devide_trans = self.DivideDataSet(10)              #随机分成10份后的数据集
 
 		# 10次测试和检验
-		for i in range(10):
-			valid_trans = devide_trans[i]
-			train_trans = []
-			for j in range(10):
-				if not j == i:
-					train_trans.extend(devide_trans[j])
-			self.InitTree()
-			self.GrowTree(train_trans,self.decision_tree)
-			print(self.decision_tree)
-			total_percent += self.ValidTree(valid_trans)
-			print(total_percent/(i+1))
-		ave_percent = total_percent/10
+		# 采用3种划分方法，和3种剪枝策略，验证数据集
+		for split_type in range(1,4):
+			self.ChangeSplitMod(split_type)
+			for prun_type in range(1,4):
+				self.ChangePrunMod(prun_type)
+				print('\n划分策略:'+self.split_type+',剪枝策略:'+self.prun_type)
+				for i in range(10):
+					valid_trans = devide_trans[i]
+					train_trans = []
+					for j in range(10):
+						if not j == i:
+							train_trans.extend(devide_trans[j])
+					self.InitTree()
+					self.GrowTree(train_trans,self.decision_tree)
+					# print(self.decision_tree)
+					total_percent += self.ValidTree(valid_trans)
+					# print(total_percent/(i+1))
+				ave_percent = total_percent/10
+				print(ave_percent)
+				total_percent = 0.0
 
 	# def BootstrapValidation(self):
 
-
 if __name__ == "__main__":
 	ms = MiningSolution("DataSet/seeds.txt")
-	ms.HoldOutMethod()
-	# ms.CrossValidation()
+	# ms.HoldOutMethod()
+	ms.CrossValidation()
 
