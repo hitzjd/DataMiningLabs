@@ -225,33 +225,66 @@ class MiningSolution:
 				major_class = label
 		return major_class
 
+	# 后剪枝
+	def PostPrun(self,tree,dataSet):
+		key = list(tree.keys())[0]
+		if key == 'final':
+			return
+
+		attr_index = int(key.split(',')[0])
+		attr_value = key.split(',')[1]
+		sub_dataSet_1,sub_dataSet_2 = self.SplitDataSet(dataSet,attr_index,attr_value)
+
+		self.PostPrun(tree[key]['low'],sub_dataSet_1)
+		self.PostPrun(tree[key]['high'],sub_dataSet_2)
+		old_corrate = self.ValidTree(dataSet,tree)
+		label = self.SelectClassLabel(dataSet)
+		new_corrate = self.ValidTree(dataSet,{'final':label})
+
+		# 若剪枝后的决策树正确率高，就替换子树为叶子节点
+		if new_corrate >= old_corrate:
+			tree.update(final=tree.pop(key))
+			tree['final'] = label
+			return new_corrate
+		return old_corrate
+
+
+
 # 测试决策树，返回正确率
-	def ValidTree(self,validSet):
+	def ValidTree(self,validSet,decision_tree):
+		if len(validSet) == 0:
+			return 0
 		pos_count = 0     #正确的预测数
 		for item in validSet:
-			key = list(self.decision_tree.keys())[0]
-			tree = self.decision_tree[key]
-			while not key == 'final':
-				attr_index = int(key.split(',')[0])
-				attr_value = key.split(',')[1]
-				try:
-					float(attr_value)
-					if item[attr_index] <= attr_value:
-						key = list(tree['low'].keys())[0]
-						tree = tree['low'][key]
-					else:
-						key = list(tree['high'].keys())[0]
-						tree = tree['high'][key]
-				except:
-					if item[attr_index] == attr_value:
-						key = list(tree['yes'].keys())[0]
-						tree = tree['yes'][key]
-					else:
-						key = list(tree['no'].keys())[0]
-						tree = tree['no'][key]
-			if tree == item[-1]:
+			if self.ValidTransaction(decision_tree,item):
 				pos_count += 1
+
 		return float(pos_count)/len(validSet)
+
+	def ValidTransaction(self,decision_tree,item):
+		key = list(decision_tree.keys())[0]
+		tree = decision_tree[key]
+		while not key == 'final':
+			attr_index = int(key.split(',')[0])
+			attr_value = key.split(',')[1]
+			try:
+				float(attr_value)
+				if item[attr_index] <= attr_value:
+					key = list(tree['low'].keys())[0]
+					tree = tree['low'][key]
+				else:
+					key = list(tree['high'].keys())[0]
+					tree = tree['high'][key]
+			except:
+				if item[attr_index] == attr_value:
+					key = list(tree['yes'].keys())[0]
+					tree = tree['yes'][key]
+				else:
+					key = list(tree['no'].keys())[0]
+					tree = tree['no'][key]	
+		if tree == item[-1]:
+			return True
+		return False
 
 
 	# 将数据集划分为part_num份
@@ -291,10 +324,13 @@ class MiningSolution:
 				print('\n划分策略:'+self.split_type+',剪枝策略:'+self.prun_type)
 				self.InitTree()
 				self.GrowTree(train_trans,self.decision_tree)
+				if self.prun_type == 'POSTPRUN':
+					cor_percent = self.PostPrun(self.decision_tree,valid_trans)
+				else:
+					cor_percent = self.ValidTree(valid_trans,self.decision_tree)
 				print(self.decision_tree)
-				cor_percent = self.ValidTree(valid_trans)
 				print(cor_percent)
-		
+
 
 	def CrossValidation(self):
 		total_percent = 0.0
@@ -316,7 +352,7 @@ class MiningSolution:
 					self.InitTree()
 					self.GrowTree(train_trans,self.decision_tree)
 					# print(self.decision_tree)
-					total_percent += self.ValidTree(valid_trans)
+					total_percent += self.ValidTree(valid_trans,self.decision_tree)
 					# print(total_percent/(i+1))
 				ave_percent = total_percent/10
 				print(ave_percent)
@@ -324,8 +360,44 @@ class MiningSolution:
 
 	# def BootstrapValidation(self):
 
+	def AdaBoost(self,times):
+		total_size = len(self.transactions)
+		ws = []  #权值列表
+		# 初始化权值列表
+		for i in range(total_size):
+			ws.append(1/total_size)
+
+		# 迭代times次
+		for t in range(times):
+			# 选取N个数据作为训练集
+			train_set = []
+			for n in range(total_size):
+				rand_index = random.randint(0,total_size-1)
+				train_set.append(self.transactions[rand_index])
+			# 训练得到基础决策树
+			self.InitTree()
+			self.GrowTree(train_trans,self.decision_tree)
+			index = 0
+			err_total = 0
+			cor_set = []
+			err_set = []
+			for item in self.transactions:
+				if self.ValidTransaction(self.decision_tree,item):
+					err_total += ws[index]
+					cor_set.append(index)
+				else:
+					err_set.append(index)
+				index += 1
+			err_rate = err_total/total_size
+			
+
+
+
+
+
+
 if __name__ == "__main__":
 	ms = MiningSolution("DataSet/seeds.txt")
-	# ms.HoldOutMethod()
-	ms.CrossValidation()
+	ms.HoldOutMethod()
+	# ms.CrossValidation()
 
