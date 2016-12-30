@@ -102,6 +102,6 @@ class KmeansAlgo:
 			print(self.clusters[i_means])
 
 if __name__ == '__main__':
-	ka = KmeansAlgo('DataSet/seeds.txt')
-	ka.k_means(3)
+	ka = KmeansAlgo('DataSet/Seeds.txt')
+	ka.k_means(5)
 

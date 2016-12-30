@@ -1,17 +1,9 @@
-
-# -*- coding:utf-8 -*-
-
-'''
-[
-	[1.0,2.0,3.0,4.0,Iris-versicolor],
-	...
-]
-'''
-
 # -*- coding:utf-8 -*-
 from math import log
 import random
 import copy
+from sklearn.cross_validation import train_test_split  # 这里是引用了交叉验证
+from sklearn.ensemble import AdaBoostClassifier
 
 class MiningSolution:
 	def __init__(self,filename):
@@ -161,9 +153,7 @@ class MiningSolution:
 			final_label = self.SelectClassLabel(dataSet)
 			dec_tree['final'] = final_label
 			return
-		
 		best_index,best_split_value,sub_dataSet_1,sub_dataSet_2 = self.SeletBestSplit(dataSet)
-
 		# 预剪枝，将划分后子集大小小于5的划分剪去
 		if self.prun_type == 'PREPRUN':
 			if len(sub_dataSet_1)<=2 or len(sub_dataSet_2)<=2:
@@ -174,23 +164,15 @@ class MiningSolution:
 			if len(sub_dataSet_1)==0 or len(sub_dataSet_2)==0:
 				final_label = self.SelectClassLabel(dataSet)
 				dec_tree['final'] = final_label
-				return
-
-		# 确定划分属性是数值型还是字符型
-		try:
-			float(best_split_value)
-			split1 = 'low'
-			split2 = 'high'
-		except:
-			split1 = 'yes'
-			split2 = 'no'
+				
+		split1 = 'low'
+		split2 = 'high'
 		# 此处将划分属性加入决策树中
 		key = str(best_index) + ',' + str(best_split_value)     #  key format : '0,2.4'
 		dec_tree[key] = {}
 		dec_tree[key][split1] = {}
 		dec_tree[key][split2] = {}
 		self.attr_indexs.remove(best_index)      #移除已用属性
-
 		# 判断小于阈值的子集的class label是否一致
 		is_same_class,same_label = self.IsAllinOneClass(sub_dataSet_1)
 		# 如果所有元素label一致，将叶子节点的label存入决策树
@@ -198,7 +180,6 @@ class MiningSolution:
 			dec_tree[key][split1]['final'] = same_label
 		else:	
 			self.GrowTree(sub_dataSet_1,dec_tree[key][split1])
-
 		# 判断大于阈值的子集的class label是否一致
 		is_same_class,same_label = self.IsAllinOneClass(sub_dataSet_2)
 		if is_same_class:
@@ -351,53 +332,32 @@ class MiningSolution:
 							train_trans.extend(devide_trans[j])
 					self.InitTree()
 					self.GrowTree(train_trans,self.decision_tree)
-					# print(self.decision_tree)
+					print(self.decision_tree)
 					total_percent += self.ValidTree(valid_trans,self.decision_tree)
-					# print(total_percent/(i+1))
+					print(total_percent/(i+1))
 				ave_percent = total_percent/10
 				print(ave_percent)
 				total_percent = 0.0
 
-	# def BootstrapValidation(self):
+	def AdaBoostClassifier(self):
+		FeatureSet = [example[0:-1] for example in self.transactions]
+		Label = [example[-1] for example in self.transactions]
+		X_train, X_test, y_train, y_test = train_test_split(FeatureSet, Label, random_state=1)
+		clf = AdaBoostClassifier(n_estimators=100)
+		clf = clf.fit(X_train, y_train)
+		pre_labels = clf.predict(X_test)
+		print(y_test)
+		print(pre_labels)
 
-	def AdaBoost(self,times):
-		total_size = len(self.transactions)
-		ws = []  #权值列表
-		# 初始化权值列表
-		for i in range(total_size):
-			ws.append(1/total_size)
-
-		# 迭代times次
-		for t in range(times):
-			# 选取N个数据作为训练集
-			train_set = []
-			for n in range(total_size):
-				rand_index = random.randint(0,total_size-1)
-				train_set.append(self.transactions[rand_index])
-			# 训练得到基础决策树
-			self.InitTree()
-			self.GrowTree(train_trans,self.decision_tree)
-			index = 0
-			err_total = 0
-			cor_set = []
-			err_set = []
-			for item in self.transactions:
-				if self.ValidTransaction(self.decision_tree,item):
-					err_total += ws[index]
-					cor_set.append(index)
-				else:
-					err_set.append(index)
-				index += 1
-			err_rate = err_total/total_size
-			
-
-
-
-
-
+		cor_num = 0
+		for i in range(len(pre_labels)):
+			if y_test[i] == pre_labels[i]:
+				cor_num+=1
+		print(cor_num/len(pre_labels))
 
 if __name__ == "__main__":
-	ms = MiningSolution("DataSet/seeds.txt")
+	ms = MiningSolution("DataSet/Iris.txt")
 	ms.HoldOutMethod()
+	# ms.AdaBoostClassifier()
 	# ms.CrossValidation()
 
